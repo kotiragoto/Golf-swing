@@ -177,7 +177,7 @@ input[type=number]{width:64px;}
   border-radius:999px; font-size:10.5px; padding:3px 9px; cursor:pointer; font-weight:700;
 }
 .chip button:hover{color:var(--text); border-color:var(--line2);}
-.row-actions{display:flex; gap:8px; margin-top:14px;}
+.row-actions{display:flex; gap:10px; margin-top:14px; align-items:center; flex-wrap:wrap;}
 
 /* ---- side column ---- */
 .metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:9px;}
@@ -250,7 +250,7 @@ input[type=number]{width:64px;}
     <p style="margin:14px 0;">
       <label class="btn primary"><i data-ic="upload" data-ic-size="15"></i>動画ファイルを選ぶ<input id="fileInput" type="file" accept="video/*" hidden></label>
     </p>
-    <p class="hint">正面から撮影した1スイング（10秒前後）の動画がおすすめです。動画は端末内で処理され、アップロードされません。</p>
+    <p class="hint">正面または後方（飛球線後方・DTL）から撮影した1スイング（10秒前後）の動画がおすすめです。アングルは自動判定されます。動画は端末内で処理され、アップロードされません。</p>
     <div class="dz-opts">
       <label>検出モデル
         <select id="modelSelect">
@@ -312,6 +312,14 @@ input[type=number]{width:64px;}
         <div class="row-actions">
           <button id="reanalyzeBtn" class="btn small"><i data-ic="refresh-cw" data-ic-size="13"></i>再解析</button>
           <label class="btn small ghost"><i data-ic="folder-open" data-ic-size="13"></i>別の動画を開く<input id="fileInput2" type="file" accept="video/*" hidden></label>
+          <label class="chk">撮影アングル
+            <select id="viewSelect">
+              <option value="auto" selected>自動判定</option>
+              <option value="face">正面</option>
+              <option value="dtl">後方（DTL）</option>
+            </select>
+          </label>
+          <span id="viewBadge" class="hint"></span>
         </div>
       </div>
 
@@ -329,7 +337,7 @@ input[type=number]{width:64px;}
         <div class="card" id="evalCard">
           <h3><i data-ic="clipboard-check" data-ic-size="16"></i><span class="h3t"><em>SWING REPORT</em><span>スイング評価</span></span><span id="scoreBadge" hidden></span></h3>
           <div id="evalList"><p class="hint">解析が完了すると評価が表示されます。</p></div>
-          <p class="hint" style="margin-top:8px;">※ 正面からの撮影を想定した目安です。フェーズ（アドレス等）は下のチップから手動修正できます。</p>
+          <p class="hint" style="margin-top:8px;" id="evalHint">※ 評価は目安です。フェーズ（アドレス等）は下のチップから手動修正できます。</p>
         </div>
       </div>
     </div>
@@ -491,7 +499,8 @@ const els = {
   heightInput:$("heightInput"),
   phaseMarkers:$("phaseMarkers"), phaseRow:$("phaseRow"),
   metricCards:$("metricCards"), chart:$("chartCanvas"),
-  evalList:$("evalList"), scoreBadge:$("scoreBadge"),
+  evalList:$("evalList"), scoreBadge:$("scoreBadge"), evalHint:$("evalHint"),
+  viewSelect:$("viewSelect"), viewBadge:$("viewBadge"),
   camCanvas:$("camCanvas"), camVideo:$("camVideo"), camHint:$("camHint"),
   camStartBtn:$("camStartBtn"), camFlipBtn:$("camFlipBtn"), camMirror:$("camMirror"),
   camBaselineBtn:$("camBaselineBtn"), camRecBtn:$("camRecBtn"),
@@ -519,7 +528,8 @@ const A = {
   frames:[],          // {t, lm, m}
   S:null,             // 派生系列 {t[], shoulder[], hip[], xf[], tilt[], headCm[], hipCm[], speed[]}
   phases:null,        // {address, top, impact, finish} → framesのインデックス
-  derived:null,       // {tempo, cmPerPx, items, score, warning}
+  derived:null,       // {tempo, cmPerPx, items, score, warning, view}
+  viewResolved:"face", // 撮影アングル判定結果 face | dtl
   analyzed:false, analyzing:false, token:0,
 };
 let lastVideoTs = 0;   // detectForVideoへ渡すタイムスタンプは単調増加が必須
@@ -896,6 +906,7 @@ function buildSeries(t, speed){
     hipU:      unwrapDeg(raw("hipRaw")),
     tiltRaw:   raw("tilt"),
     noseX: A.frames.map(f => f.m?.nose?.x ?? null),
+    noseY: A.frames.map(f => f.m?.nose?.y ?? null),
     hipX:  A.frames.map(f => f.m?.midHip?.x ?? null),
     // 表示用（deriveMetricsで再計算される）
     shoulder:[], hip:[], xf:[], tilt:[], headCm:[], hipCm:[],
@@ -934,19 +945,41 @@ function deriveMetrics(){
   const xf = shoulder.map((v,i) => (v==null || hip[i]==null) ? null : v - hip[i]);
   const tilt = movingAvg(S.tiltRaw, 3);
 
-  // cm換算スケール: アドレス時の鼻〜足首のピクセル距離 ≒ 身長の88%
+  // 撮影アングルの判定（自動: アドレス時の肩ラインが奥行き方向を向いていれば後方=DTL）
+  const sel = els.viewSelect.value;
+  let view = sel;
+  if (sel === "auto"){
+    const a180 = ((S.shoulderU[aV] % 180) + 180) % 180;
+    view = Math.abs(a180 - 90) <= 45 ? "dtl" : "face";
+  }
+  A.viewResolved = view;
+
+  // cm換算スケール（DTLは前傾で鼻の高さが下がるため腰〜足首基準を優先）
   const heightCm = parseFloat(els.heightInput.value) || 170;
   const am = A.frames[aV].m;
   let cmPerPx = null;
-  if (am?.nose && am.ankleY != null && Math.abs(am.ankleY - am.nose.y) > 10){
+  if (view === "dtl" && am?.midHip && am.ankleY != null && Math.abs(am.ankleY - am.midHip.y) > 10){
+    cmPerPx = (heightCm * 0.51) / Math.abs(am.ankleY - am.midHip.y);
+  } else if (am?.nose && am.ankleY != null && Math.abs(am.ankleY - am.nose.y) > 10){
     cmPerPx = (heightCm * 0.88) / Math.abs(am.ankleY - am.nose.y);
   } else if (am?.nose && am.midHip){
     // 足首が見えない場合は 鼻〜腰 ≒ 身長の45% で代用
     cmPerPx = (heightCm * 0.45) / Math.max(10, Math.hypot(am.midHip.x - am.nose.x, am.midHip.y - am.nose.y));
   }
-  const noseBase = S.noseX[aV], hipXBase = S.hipX[aV];
-  S.headCm = S.noseX.map(v => (v==null || cmPerPx==null || noseBase==null) ? null : (v - noseBase) * cmPerPx);
-  S.hipCm  = S.hipX.map(v => (v==null || cmPerPx==null || hipXBase==null) ? null : (v - hipXBase) * cmPerPx);
+
+  // 位置系の系列（正面: 頭・腰の横ブレ / DTL: 頭の上下動・腰の前後移動）
+  const noseXBase = S.noseX[aV], noseYBase = S.noseY[aV], hipXBase = S.hipX[aV];
+  // DTLではボール方向（構えた時に手が垂れる側）を正にする
+  let ballDir = 1;
+  if (view === "dtl" && am?.wrist && am?.midHip) ballDir = (am.wrist.x - am.midHip.x) >= 0 ? 1 : -1;
+  const cmOf = (v, base) => (v==null || cmPerPx==null || base==null) ? null : (v - base) * cmPerPx;
+  S.headCm = (view === "dtl")
+    ? S.noseY.map(v => cmOf(v, noseYBase))
+    : S.noseX.map(v => cmOf(v, noseXBase));
+  S.hipCm = S.hipX.map(v => {
+    const c = cmOf(v, hipXBase);
+    return (c==null) ? null : (view === "dtl" ? c * ballDir : c);
+  });
   S.shoulder = shoulder; S.hip = hip; S.xf = xf; S.tilt = tilt;
 
   // ---- 評価 ----
@@ -963,6 +996,14 @@ function deriveMetrics(){
     }
     return m;
   };
+  const rangeMax = (arr, i0, i1) => {
+    let m = null;
+    for (let i = Math.min(i0,i1); i <= Math.max(i0,i1); i++){
+      if (arr[i]==null) continue;
+      if (m==null || arr[i]>m) m = arr[i];
+    }
+    return m;
+  };
 
   const tempo = (S.t[P.impact] > S.t[P.top] && S.t[P.top] > S.t[P.address])
     ? (S.t[P.top] - S.t[P.address]) / (S.t[P.impact] - S.t[P.top]) : null;
@@ -971,6 +1012,8 @@ function deriveMetrics(){
   const xfTop = at(xf, P.top);
   const headSway = rangeAbsMax(S.headCm, P.address, P.impact);
   const hipSway  = rangeAbsMax(S.hipCm, P.address, P.top);
+  const eeRaw = rangeMax(S.hipCm, P.address, P.impact);           // DTL: ボール方向への最大移動
+  const earlyExt = eeRaw==null ? null : Math.max(0, eeRaw);
   const tiltA = at(tilt, P.address), tiltI = at(tilt, P.impact);
   const tiltKeep = (tiltA!=null && tiltI!=null) ? Math.abs(tiltI - tiltA) : null;
 
@@ -994,12 +1037,21 @@ function deriveMetrics(){
     { name:"X-Factor 捻転差（トップ）", value:xfTop==null?null:Math.abs(xfTop), disp:v=>`${v.toFixed(0)}°`, ideal:"目安 25〜60°",
       g:grade(xfTop==null?null:Math.abs(xfTop), 25, 60, 15, 75),
       advice: xfTop==null?null: Math.abs(xfTop)<25 ? "肩と腰の捻転差が小さめ。飛距離ロスの原因になります。" : Math.abs(xfTop)>60 ? "捻転差が非常に大きいです。体への負担に注意。" : "良い捻転差が作れています。" },
-    { name:"頭の横ブレ（アドレス→インパクト）", value:headSway, disp:v=>`${v.toFixed(1)} cm`, ideal:"目安 8cm以内",
-      g:grade(headSway, 0, 8, 0, 15),
-      advice: headSway==null?null: headSway>15 ? "頭が大きく動いています。軸を保つ意識を。" : headSway>8 ? "やや頭が動いています。" : "頭の位置が安定しています。" },
-    { name:"腰のスウェー（バックスイング）", value:hipSway, disp:v=>`${v.toFixed(1)} cm`, ideal:"目安 8cm以内",
-      g:grade(hipSway, 0, 8, 0, 15),
-      advice: hipSway==null?null: hipSway>15 ? "腰が横に流れています。その場で回転する意識を。" : hipSway>8 ? "やや腰が流れています。" : "下半身が安定しています。" },
+    ...(view === "dtl" ? [
+      { name:"頭の上下動（アドレス→インパクト）", value:headSway, disp:v=>`${v.toFixed(1)} cm`, ideal:"目安 8cm以内",
+        g:grade(headSway, 0, 8, 0, 15),
+        advice: headSway==null?null: headSway>15 ? "頭が大きく上下しています。目線の高さをキープしましょう。" : headSway>8 ? "やや上下動があります。" : "頭の高さが安定しています。" },
+      { name:"アーリーエクステンション（腰の前後）", value:earlyExt, disp:v=>`+${v.toFixed(1)} cm`, ideal:"目安 +5cm以内",
+        g:grade(earlyExt, 0, 5, 0, 10),
+        advice: earlyExt==null?null: earlyExt>10 ? "腰がボール方向へ突き出ています。お尻を後ろのラインに保つ意識を。" : earlyExt>5 ? "やや腰が前に出ています。" : "腰のラインをキープできています。" },
+    ] : [
+      { name:"頭の横ブレ（アドレス→インパクト）", value:headSway, disp:v=>`${v.toFixed(1)} cm`, ideal:"目安 8cm以内",
+        g:grade(headSway, 0, 8, 0, 15),
+        advice: headSway==null?null: headSway>15 ? "頭が大きく動いています。軸を保つ意識を。" : headSway>8 ? "やや頭が動いています。" : "頭の位置が安定しています。" },
+      { name:"腰のスウェー（バックスイング）", value:hipSway, disp:v=>`${v.toFixed(1)} cm`, ideal:"目安 8cm以内",
+        g:grade(hipSway, 0, 8, 0, 15),
+        advice: hipSway==null?null: hipSway>15 ? "腰が横に流れています。その場で回転する意識を。" : hipSway>8 ? "やや腰が流れています。" : "下半身が安定しています。" },
+    ]),
     { name:"前傾キープ（アドレス→インパクト）", value:tiltKeep, disp:v=>`変化 ${v.toFixed(0)}°`, ideal:"目安 変化8°以内",
       g:grade(tiltKeep, 0, 8, 0, 15),
       advice: tiltKeep==null?null: tiltKeep>15 ? "前傾角が大きく変化しています（起き上がり/沈み込み）。" : tiltKeep>8 ? "前傾角がやや変化しています。" : "前傾角をキープできています。" },
@@ -1007,7 +1059,7 @@ function deriveMetrics(){
   const scores = items.filter(x => x.g).map(x => x.g==="good" ? 100 : x.g==="ok" ? 65 : 35);
   const score = scores.length ? Math.round(scores.reduce((s,v)=>s+v,0) / scores.length) : null;
 
-  A.derived = { tempo, cmPerPx, items, score, warning:null };
+  A.derived = { tempo, cmPerPx, items, score, warning:null, view };
 }
 
 /* =========================================================
@@ -1125,13 +1177,19 @@ function drawStage(t, idxOverride){
     ctx.strokeStyle = COLORS.spine; ctx.lineWidth = lw * 1.3;      // 背骨ライン
     ctx.beginPath(); ctx.moveTo(m.midHip.x, m.midHip.y); ctx.lineTo(m.midShoulder.x, m.midShoulder.y); ctx.stroke();
 
-    // アドレス時の頭位置ガイド（縦線）と現在の頭位置
+    // アドレス基準線（頭: 黄 / 腰: 紫）。DTLでは頭の高さの横線も引く
     if (P && A.frames[P.address]?.m){
-      const baseX = A.frames[P.address].m.nose.x;
+      const bm = A.frames[P.address].m;
       ctx.save();
-      ctx.strokeStyle = "rgba(255,211,77,.8)"; ctx.lineWidth = Math.max(1, lw * 0.6);
+      ctx.lineWidth = Math.max(1, lw * 0.6);
       ctx.setLineDash([6, 5]);
-      ctx.beginPath(); ctx.moveTo(baseX, 0); ctx.lineTo(baseX, A.ch); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,211,77,.8)";
+      ctx.beginPath(); ctx.moveTo(bm.nose.x, 0); ctx.lineTo(bm.nose.x, A.ch); ctx.stroke();
+      if (A.viewResolved === "dtl"){
+        ctx.beginPath(); ctx.moveTo(0, bm.nose.y); ctx.lineTo(A.cw, bm.nose.y); ctx.stroke();
+      }
+      ctx.strokeStyle = "rgba(141,159,255,.7)";
+      ctx.beginPath(); ctx.moveTo(bm.midHip.x, 0); ctx.lineTo(bm.midHip.x, A.ch); ctx.stroke();
       ctx.restore();
       ctx.fillStyle = COLORS.headGuide;
       ctx.beginPath(); ctx.arc(m.nose.x, m.nose.y, lw * 1.6, 0, Math.PI * 2); ctx.fill();
@@ -1168,7 +1226,22 @@ function buildCards(container, defs){
   }
   return map;
 }
-const videoCards = buildCards(els.metricCards, CARD_DEFS);
+// 位置系カード(5,6枚目)は撮影アングルでラベルが変わる
+function videoCardDefs(view){
+  const pos = (view === "dtl") ? [
+    { k:"headCm", label:"頭の上下動",             unit:"cm", sub:"アドレス基準 ±8cm目安",   color:"var(--gold)",  fmt:v=>(v>=0?"+":"")+v.toFixed(1) },
+    { k:"hipCm",  label:"腰の前後（＋でボール方向）", unit:"cm", sub:"+5cm以内が目安",        color:"var(--coral)", fmt:v=>(v>=0?"+":"")+v.toFixed(1) },
+  ] : CARD_DEFS.slice(4);
+  return [...CARD_DEFS.slice(0, 4), ...pos];
+}
+let videoCards = buildCards(els.metricCards, videoCardDefs("face"));
+let cardsView = "face";
+function refreshVideoCards(){
+  const v = A.viewResolved || "face";
+  if (v === cardsView) return;
+  cardsView = v;
+  videoCards = buildCards(els.metricCards, videoCardDefs(v));
+}
 const camCards = buildCards(els.camMetricCards, CARD_DEFS.filter(d => ["shoulder","hip","xf","tilt","headCm"].includes(d.k)));
 
 function updateCards(map, values){
@@ -1228,11 +1301,15 @@ function renderPhaseUI(){
 
 function renderEval(){
   const D = A.derived;
+  refreshVideoCards();
+  els.viewBadge.textContent = (els.viewSelect.value === "auto" && D?.view)
+    ? `判定: ${D.view === "dtl" ? "後方" : "正面"}` : "";
   if (!D || !D.items){
     els.scoreBadge.hidden = true;
     els.evalList.innerHTML = `<p class="hint">${D?.warning ?? "解析が完了すると評価が表示されます。"}</p>`;
     return;
   }
+  els.evalHint.textContent = `※ ${D.view === "dtl" ? "後方（飛球線後方）" : "正面"}撮影として評価した目安です。フェーズ（アドレス等）は下のチップから手動修正できます。`;
   els.scoreBadge.hidden = D.score == null;
   if (D.score != null){
     els.scoreBadge.innerHTML = `${ic("gauge",13)}総合 ${D.score}点`;
@@ -1423,6 +1500,9 @@ els.timeline.addEventListener("input", () => {
   els.srcVideo.currentTime = parseFloat(els.timeline.value);
 });
 els.heightInput.onchange = () => {
+  if (A.analyzed){ deriveMetrics(); renderEval(); renderChart(); }
+};
+els.viewSelect.onchange = () => {
   if (A.analyzed){ deriveMetrics(); renderEval(); renderChart(); }
 };
 
@@ -1661,6 +1741,7 @@ window.__swingTest = {
     phases: (A.phases && A.S) ? Object.fromEntries(Object.entries(A.phases).map(([k, i]) => [k, A.S.t[i]])) : null,
     tempo: A.derived?.tempo ?? null,
     score: A.derived?.score ?? null,
+    view: A.derived?.view ?? null,
     warning: A.derived?.warning ?? null,
     items: A.derived?.items?.map(it => ({ name:it.name, g:it.g, value:it.value })) ?? null,
     seriesAtTop: (A.phases && A.S) ? {
