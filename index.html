@@ -218,6 +218,31 @@ input[type=number]{width:64px;}
 .eval-val{font-variant-numeric:tabular-nums; color:var(--sub); font-size:12px; white-space:nowrap;}
 .eval-val b{color:var(--text); font-size:13.5px;}
 
+/* ---- history ---- */
+.hist-title{display:flex; align-items:flex-start; gap:9px; color:var(--peri); margin-bottom:14px;}
+.hist-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px;}
+.hist-card{
+  background:var(--panel); border:1px solid var(--line); border-radius:14px;
+  overflow:hidden; cursor:pointer; transition:.15s;
+}
+.hist-card:hover{border-color:var(--peri); transform:translateY(-2px);}
+.hist-card img{display:block; width:100%; aspect-ratio:4/5; object-fit:contain; background:#080d38;}
+.hist-card .hc-noimg{width:100%; aspect-ratio:4/5; background:#080d38;}
+.hist-card .hc-body{padding:10px 13px 12px;}
+.hc-date{font-size:11.5px; color:var(--sub); font-weight:700;}
+.hc-row{display:flex; align-items:center; gap:9px; margin-top:5px; flex-wrap:wrap;}
+.hc-score{font-family:var(--display); font-size:22px; letter-spacing:.02em; line-height:1;}
+.hc-score small{font-family:var(--font); font-size:11px; font-weight:700; color:var(--sub); margin-left:2px;}
+.hc-chip{
+  font-size:10px; font-weight:900; padding:2px 10px; border-radius:999px;
+  background:rgba(141,159,255,.14); color:var(--peri); border:1px solid var(--line2);
+}
+.hc-stats{font-size:10.5px; color:var(--sub2); margin-top:5px;}
+.hist-detail-head{display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+.btn.danger{color:#ffb3c0; border-color:rgba(255,107,129,.35);}
+.btn.danger:hover{background:rgba(255,77,103,.14); border-color:var(--coral);}
+#histChart{width:100%; height:210px; display:block; cursor:crosshair;}
+
 /* ---- camera ---- */
 .camera-wrap{max-width:920px; margin:0 auto;}
 .camera-wrap .metrics{margin-top:14px;}
@@ -237,6 +262,7 @@ input[type=number]{width:64px;}
   <nav class="tabs">
     <button data-tab="video" class="active"><i data-ic="video" data-ic-size="15"></i>動画解析</button>
     <button data-tab="camera"><i data-ic="camera" data-ic-size="15"></i>リアルタイム</button>
+    <button data-tab="history"><i data-ic="history" data-ic-size="15"></i>履歴</button>
   </nav>
 </header>
 
@@ -344,6 +370,62 @@ input[type=number]{width:64px;}
   </section>
 </main>
 
+<main id="tab-history" hidden>
+  <section id="histList">
+    <h3 class="hist-title"><i data-ic="history" data-ic-size="16"></i><span class="h3t"><em>SWING HISTORY</em><span>解析履歴</span></span></h3>
+    <div class="hist-grid" id="histGrid"></div>
+    <p class="hint" id="histEmpty" hidden>まだ履歴がありません。動画を解析すると自動で保存されます（映像そのものは保存されず、骨格データとレポートのみ端末内に残ります）。</p>
+  </section>
+
+  <section id="histDetail" hidden>
+    <div class="hist-detail-head">
+      <button id="histBackBtn" class="btn small"><i data-ic="arrow-left" data-ic-size="13"></i>一覧へ戻る</button>
+      <span id="histInfo" class="hint"></span>
+      <span class="spacer" style="flex:1"></span>
+      <button id="histDeleteBtn" class="btn small ghost danger"><i data-ic="trash" data-ic-size="13"></i>この履歴を削除</button>
+    </div>
+    <div class="player-grid">
+      <div class="stage-col">
+        <div class="stage">
+          <canvas id="histCanvas" width="480" height="640"></canvas>
+          <div id="histPhaseBadge" class="phase-badge" hidden></div>
+        </div>
+        <div class="transport">
+          <button id="histPlayBtn" class="btn icon primary" title="再生/一時停止" data-ic="play" data-ic-size="17"></button>
+          <select id="histSpeed" title="再生速度">
+            <option value="0.1">0.1x</option>
+            <option value="0.25">0.25x</option>
+            <option value="0.5" selected>0.5x</option>
+            <option value="1">1x</option>
+          </select>
+          <span id="histTimeLabel" class="time">0.00 / 0.00 s</span>
+        </div>
+        <div class="timeline-wrap">
+          <input id="histTimeline" type="range" min="0" max="1" step="0.0005" value="0">
+          <div id="histMarkers"></div>
+        </div>
+        <p class="hint">骨格リプレイ表示です（映像は履歴に保存されません）。</p>
+      </div>
+      <div class="side-col">
+        <div class="metrics" id="histCards"></div>
+        <div class="card">
+          <h3><i data-ic="chart-line" data-ic-size="16"></i><span class="h3t"><em>ANGLE TIMELINE</em><span>回転角の推移（クリックでジャンプ）</span></span></h3>
+          <canvas id="histChart"></canvas>
+          <div class="legend">
+            <span><i style="background:var(--amber)"></i>肩の回転</span>
+            <span><i style="background:var(--peri)"></i>腰の回転</span>
+            <span><i style="background:var(--mint)"></i>X-Factor（捻転差）</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3><i data-ic="clipboard-check" data-ic-size="16"></i><span class="h3t"><em>SWING REPORT</em><span>スイング評価</span></span><span id="histScore" hidden></span></h3>
+          <div id="histEval"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
 <main id="tab-camera" hidden>
   <section class="camera-wrap">
     <div class="stage cam">
@@ -406,6 +488,9 @@ const ICONS = {
   "square": '<rect width="14" height="14" x="5" y="5" rx="2"/>',
   "x": '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   "loader": '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+  "history": '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  "trash": '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+  "arrow-left": '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
 };
 function ic(name, size = 16, cls = ""){
   return `<svg class="ic ${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
@@ -506,6 +591,12 @@ const els = {
   camBaselineBtn:$("camBaselineBtn"), camRecBtn:$("camRecBtn"),
   camFps:$("camFps"), recBadge:$("recBadge"), recTime:$("recTime"),
   camMetricCards:$("camMetricCards"),
+  histList:$("histList"), histDetail:$("histDetail"), histGrid:$("histGrid"), histEmpty:$("histEmpty"),
+  histBackBtn:$("histBackBtn"), histDeleteBtn:$("histDeleteBtn"), histInfo:$("histInfo"),
+  histCanvas:$("histCanvas"), histPhaseBadge:$("histPhaseBadge"),
+  histPlayBtn:$("histPlayBtn"), histSpeed:$("histSpeed"), histTimeLabel:$("histTimeLabel"),
+  histTimeline:$("histTimeline"), histMarkers:$("histMarkers"),
+  histCards:$("histCards"), histChart:$("histChart"), histScore:$("histScore"), histEval:$("histEval"),
 };
 const ctx = els.stage.getContext("2d");
 const camCtx = els.camCanvas.getContext("2d");
@@ -552,8 +643,11 @@ document.querySelectorAll(".tabs button").forEach(b => {
 function switchTab(tab){
   currentTab = tab;
   document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("active", x.dataset.tab===tab));
-  $("tab-video").hidden  = tab!=="video";
-  $("tab-camera").hidden = tab!=="camera";
+  $("tab-video").hidden   = tab!=="video";
+  $("tab-camera").hidden  = tab!=="camera";
+  $("tab-history").hidden = tab!=="history";
+  if (tab === "history") renderHistoryList();
+  else H.playing = false;
 }
 
 /* =========================================================
@@ -679,6 +773,8 @@ async function loadVideoFromFile(file){
   A.token++;                       // 進行中の解析をキャンセル
   A.analyzing = false; A.analyzed = false;
   A.frames = []; A.S = null; A.phases = null; A.derived = null;
+  A.historyId = null; A.historyCreatedAt = null; A.histSuppressed = false;
+  A.videoName = file.name || "";
 
   const v = els.srcVideo;
   if (A.url) URL.revokeObjectURL(A.url);
@@ -744,6 +840,8 @@ function seekTo(v, t){
 async function analyzeVideo(){
   const v = els.srcVideo;
   const token = ++A.token;
+  // 履歴を削除した後の明示的な再解析は、新しいエントリとして保存し直す
+  if (A.histSuppressed){ A.histSuppressed = false; A.historyId = null; A.historyCreatedAt = null; }
   A.analyzing = true; A.analyzed = false;
   A.frames = []; A.S = null; A.phases = null; A.derived = null;
   els.overlay.hidden = false;
@@ -1065,9 +1163,8 @@ function deriveMetrics(){
 /* =========================================================
    描画：ステージ（動画 + 骨格オーバーレイ）
 ========================================================= */
-function nearestIdx(t){
-  const T = A.S ? A.S.t : A.frames.map(f => f.t);
-  if (!T.length) return -1;
+function nearestIdxIn(T, t){
+  if (!T || !T.length) return -1;
   let lo = 0, hi = T.length - 1;
   while (lo < hi){
     const mid = (lo + hi) >> 1;
@@ -1075,6 +1172,9 @@ function nearestIdx(t){
   }
   if (lo > 0 && Math.abs(T[lo-1] - t) < Math.abs(T[lo] - t)) lo--;
   return lo;
+}
+function nearestIdx(t){
+  return nearestIdxIn(A.S ? A.S.t : A.frames.map(f => f.t), t);
 }
 
 function drawSkeleton(c, lm, cw, ch, opts={}){
@@ -1116,12 +1216,12 @@ function extendLine(c, p1, p2, factor, color, lw, dash){
   c.restore();
 }
 
-function labelText(c, text, x, y, color){
-  const fs = Math.max(11, A.cw * 0.016);
+function labelText(c, text, x, y, color, cw, ch){
+  const fs = Math.max(11, cw * 0.016);
   c.save();
   c.font = `700 ${fs}px 'Lato',sans-serif`;
   const w = c.measureText(text).width;
-  const px = clamp(x, 4, A.cw - w - 10), py = clamp(y, fs + 4, A.ch - 6);
+  const px = clamp(x, 4, cw - w - 10), py = clamp(y, fs + 4, ch - 6);
   c.fillStyle = "rgba(5,10,48,.75)";
   c.fillRect(px - 4, py - fs - 2, w + 8, fs + 8);
   c.fillStyle = color;
@@ -1129,77 +1229,86 @@ function labelText(c, text, x, y, color){
   c.restore();
 }
 
+// オーバーレイ描画（動画ステージと履歴リプレイで共用）
+function drawOverlays(c, o){
+  const { cw, ch, frames, S, P, idx, view } = o;
+  const f = frames[idx];
+  if (!f) return;
+
+  // アドレスの残像
+  if (o.ghost && P && frames[P.address]?.lm && idx !== P.address){
+    drawSkeleton(c, frames[P.address].lm, cw, ch, { color:"#9ca3af", alpha:0.35, noJoints:true });
+  }
+  // 手元の軌跡
+  if (o.trail){
+    const start = P ? P.address : 0;
+    c.save();
+    c.lineCap = "round";
+    let prev = null;
+    for (let i = start; i <= idx; i++){
+      const w = frames[i].m?.wrist;
+      if (!w){ prev = null; continue; }
+      if (prev){
+        const age = (i - start) / Math.max(1, idx - start);
+        c.strokeStyle = `rgba(56,189,248,${(0.15 + 0.65 * age).toFixed(3)})`;
+        c.lineWidth = Math.max(1.5, cw / 500);
+        c.beginPath(); c.moveTo(prev.x, prev.y); c.lineTo(w.x, w.y); c.stroke();
+      }
+      prev = w;
+    }
+    c.restore();
+  }
+
+  if (o.skeleton && f.lm){
+    drawSkeleton(c, f.lm, cw, ch, { color:COLORS.skeleton });
+  }
+  if (o.guides && f.m && f.lm){
+    const m = f.m;
+    const lw = Math.max(2, cw / 420);
+    const shL = { x: f.lm[LM.L_SHOULDER].x * cw, y: f.lm[LM.L_SHOULDER].y * ch };
+    const shR = { x: f.lm[LM.R_SHOULDER].x * cw, y: f.lm[LM.R_SHOULDER].y * ch };
+    const hpL = { x: f.lm[LM.L_HIP].x * cw, y: f.lm[LM.L_HIP].y * ch };
+    const hpR = { x: f.lm[LM.R_HIP].x * cw, y: f.lm[LM.R_HIP].y * ch };
+    extendLine(c, shR, shL, 1.9, COLORS.shoulderLine, lw);       // 肩ライン
+    extendLine(c, hpR, hpL, 2.3, COLORS.hipLine, lw);           // 腰ライン
+    c.strokeStyle = COLORS.spine; c.lineWidth = lw * 1.3;        // 背骨ライン
+    c.beginPath(); c.moveTo(m.midHip.x, m.midHip.y); c.lineTo(m.midShoulder.x, m.midShoulder.y); c.stroke();
+
+    // アドレス基準線（頭: 黄 / 腰: 紫）。DTLでは頭の高さの横線も引く
+    if (P && frames[P.address]?.m){
+      const bm = frames[P.address].m;
+      c.save();
+      c.lineWidth = Math.max(1, lw * 0.6);
+      c.setLineDash([6, 5]);
+      c.strokeStyle = "rgba(255,211,77,.8)";
+      c.beginPath(); c.moveTo(bm.nose.x, 0); c.lineTo(bm.nose.x, ch); c.stroke();
+      if (view === "dtl"){
+        c.beginPath(); c.moveTo(0, bm.nose.y); c.lineTo(cw, bm.nose.y); c.stroke();
+      }
+      c.strokeStyle = "rgba(141,159,255,.7)";
+      c.beginPath(); c.moveTo(bm.midHip.x, 0); c.lineTo(bm.midHip.x, ch); c.stroke();
+      c.restore();
+      c.fillStyle = COLORS.headGuide;
+      c.beginPath(); c.arc(m.nose.x, m.nose.y, lw * 1.6, 0, Math.PI * 2); c.fill();
+    }
+    // 角度ラベル
+    if (o.labels && S && S.shoulder[idx] != null){
+      labelText(c, `肩 ${S.shoulder[idx].toFixed(0)}°`, (shL.x + shR.x)/2 + 12, (shL.y + shR.y)/2 - 10, COLORS.shoulderLine, cw, ch);
+      if (S.hip[idx] != null) labelText(c, `腰 ${S.hip[idx].toFixed(0)}°`, (hpL.x + hpR.x)/2 + 12, (hpL.y + hpR.y)/2 + 22, COLORS.hipLine, cw, ch);
+    }
+  }
+}
+
 function drawStage(t, idxOverride){
   const v = els.srcVideo;
   ctx.drawImage(v, 0, 0, A.cw, A.ch);
   const idx = idxOverride ?? nearestIdx(t);
   if (idx < 0 || !A.frames[idx]) return;
-
-  const S = A.S, P = A.phases;
-
-  // アドレスの残像
-  if ($("tglGhost").checked && P && A.frames[P.address]?.lm && idx !== P.address){
-    drawSkeleton(ctx, A.frames[P.address].lm, A.cw, A.ch, { color:"#9ca3af", alpha:0.35, noJoints:true });
-  }
-  // 手元の軌跡
-  if ($("tglTrail").checked && A.analyzed){
-    const start = P ? P.address : 0;
-    ctx.save();
-    ctx.lineCap = "round";
-    let prev = null;
-    for (let i = start; i <= idx; i++){
-      const w = A.frames[i].m?.wrist;
-      if (!w){ prev = null; continue; }
-      if (prev){
-        const age = (i - start) / Math.max(1, idx - start);
-        ctx.strokeStyle = `rgba(56,189,248,${(0.15 + 0.65 * age).toFixed(3)})`;
-        ctx.lineWidth = Math.max(1.5, A.cw / 500);
-        ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(w.x, w.y); ctx.stroke();
-      }
-      prev = w;
-    }
-    ctx.restore();
-  }
-
-  const f = A.frames[idx];
-  if ($("tglSkeleton").checked && f.lm){
-    drawSkeleton(ctx, f.lm, A.cw, A.ch, { color:COLORS.skeleton });
-  }
-  if ($("tglGuides").checked && f.m){
-    const m = f.m;
-    const lw = Math.max(2, A.cw / 420);
-    const shL = { x: f.lm[LM.L_SHOULDER].x * A.cw, y: f.lm[LM.L_SHOULDER].y * A.ch };
-    const shR = { x: f.lm[LM.R_SHOULDER].x * A.cw, y: f.lm[LM.R_SHOULDER].y * A.ch };
-    const hpL = { x: f.lm[LM.L_HIP].x * A.cw, y: f.lm[LM.L_HIP].y * A.ch };
-    const hpR = { x: f.lm[LM.R_HIP].x * A.cw, y: f.lm[LM.R_HIP].y * A.ch };
-    extendLine(ctx, shR, shL, 1.9, COLORS.shoulderLine, lw);       // 肩ライン
-    extendLine(ctx, hpR, hpL, 2.3, COLORS.hipLine, lw);           // 腰ライン
-    ctx.strokeStyle = COLORS.spine; ctx.lineWidth = lw * 1.3;      // 背骨ライン
-    ctx.beginPath(); ctx.moveTo(m.midHip.x, m.midHip.y); ctx.lineTo(m.midShoulder.x, m.midShoulder.y); ctx.stroke();
-
-    // アドレス基準線（頭: 黄 / 腰: 紫）。DTLでは頭の高さの横線も引く
-    if (P && A.frames[P.address]?.m){
-      const bm = A.frames[P.address].m;
-      ctx.save();
-      ctx.lineWidth = Math.max(1, lw * 0.6);
-      ctx.setLineDash([6, 5]);
-      ctx.strokeStyle = "rgba(255,211,77,.8)";
-      ctx.beginPath(); ctx.moveTo(bm.nose.x, 0); ctx.lineTo(bm.nose.x, A.ch); ctx.stroke();
-      if (A.viewResolved === "dtl"){
-        ctx.beginPath(); ctx.moveTo(0, bm.nose.y); ctx.lineTo(A.cw, bm.nose.y); ctx.stroke();
-      }
-      ctx.strokeStyle = "rgba(141,159,255,.7)";
-      ctx.beginPath(); ctx.moveTo(bm.midHip.x, 0); ctx.lineTo(bm.midHip.x, A.ch); ctx.stroke();
-      ctx.restore();
-      ctx.fillStyle = COLORS.headGuide;
-      ctx.beginPath(); ctx.arc(m.nose.x, m.nose.y, lw * 1.6, 0, Math.PI * 2); ctx.fill();
-    }
-    // 角度ラベル
-    if (S && A.analyzed && S.shoulder[idx] != null){
-      labelText(ctx, `肩 ${S.shoulder[idx].toFixed(0)}°`, (shL.x + shR.x)/2 + 12, (shL.y + shR.y)/2 - 10, COLORS.shoulderLine);
-      if (S.hip[idx] != null) labelText(ctx, `腰 ${S.hip[idx].toFixed(0)}°`, (hpL.x + hpR.x)/2 + 12, (hpL.y + hpR.y)/2 + 22, COLORS.hipLine);
-    }
-  }
+  drawOverlays(ctx, {
+    cw:A.cw, ch:A.ch, frames:A.frames, S:A.S, P:A.phases, idx, view:A.viewResolved,
+    ghost:$("tglGhost").checked, trail:$("tglTrail").checked && A.analyzed,
+    skeleton:$("tglSkeleton").checked, guides:$("tglGuides").checked, labels:A.analyzed,
+  });
 }
 
 /* =========================================================
@@ -1251,8 +1360,7 @@ function updateCards(map, values){
   }
 }
 
-function phaseBadgeHTML(t){
-  const P = A.phases, S = A.S;
+function phaseBadgeHTML(t, S, P){
   if (!P || !S) return "";
   const pt = k => S.t[P[k]];
   for (const d of PHASE_DEFS){
@@ -1299,6 +1407,25 @@ function renderPhaseUI(){
   }
 }
 
+const scoreGrad = s => s >= 80 ? "linear-gradient(135deg,#0da678,#2ee6a8)" : s >= 60 ? "linear-gradient(135deg,#b98a10,#ffb800)" : "linear-gradient(135deg,#c2274b,#ff4d67)";
+
+// 評価リストのHTML（動画タブと履歴で共用。dispOfで値の表示文字列を取り出す）
+function evalListHTML(items, dispOf){
+  const iconOf = g => g==="good" ? ["circle-check","good"] : g==="ok" ? ["circle-minus","ok"] : ["circle-x","bad"];
+  return items.map(it => {
+    if (it.g == null){
+      return `<div class="eval-item"><span class="eval-icon na">${ic("circle-minus",16)}</span><span class="eval-name">${it.name}</span><span class="eval-val">計測不可</span></div>`;
+    }
+    const [icn, cls] = iconOf(it.g);
+    return `<div class="eval-item">
+      <span class="eval-icon ${cls}">${ic(icn,16)}</span>
+      <span class="eval-name">${it.name}</span>
+      <span class="eval-val"><b>${dispOf(it)}</b>　${it.ideal}</span>
+      <span class="eval-advice">${it.advice ?? ""}</span>
+    </div>`;
+  }).join("");
+}
+
 function renderEval(){
   const D = A.derived;
   refreshVideoCards();
@@ -1313,28 +1440,16 @@ function renderEval(){
   els.scoreBadge.hidden = D.score == null;
   if (D.score != null){
     els.scoreBadge.innerHTML = `${ic("gauge",13)}総合 ${D.score}点`;
-    els.scoreBadge.style.background = D.score >= 80 ? "linear-gradient(135deg,#0da678,#2ee6a8)" : D.score >= 60 ? "linear-gradient(135deg,#b98a10,#ffb800)" : "linear-gradient(135deg,#c2274b,#ff4d67)";
+    els.scoreBadge.style.background = scoreGrad(D.score);
   }
-  const iconOf = g => g==="good" ? ["circle-check","good"] : g==="ok" ? ["circle-minus","ok"] : ["circle-x","bad"];
-  els.evalList.innerHTML = D.items.map(it => {
-    if (it.g == null){
-      return `<div class="eval-item"><span class="eval-icon na">${ic("circle-minus",16)}</span><span class="eval-name">${it.name}</span><span class="eval-val">計測不可</span></div>`;
-    }
-    const [icn, cls] = iconOf(it.g);
-    return `<div class="eval-item">
-      <span class="eval-icon ${cls}">${ic(icn,16)}</span>
-      <span class="eval-name">${it.name}</span>
-      <span class="eval-val"><b>${it.disp(it.value)}</b>　${it.ideal}</span>
-      <span class="eval-advice">${it.advice ?? ""}</span>
-    </div>`;
-  }).join("");
+  els.evalList.innerHTML = evalListHTML(D.items, it => it.disp(it.value));
+  scheduleHistorySave();
 }
 
 /* =========================================================
    チャート描画
 ========================================================= */
-function renderChart(){
-  const cv = els.chart;
+function drawChartInto(cv, S, phases, curT, ready){
   const rect = cv.getBoundingClientRect();
   if (rect.width === 0) return;
   const dpr = window.devicePixelRatio || 1;
@@ -1344,16 +1459,15 @@ function renderChart(){
   }
   const c = cv.getContext("2d");
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const W = rect.width, H = 210;
-  c.clearRect(0, 0, W, H);
+  const W = rect.width, CH = 210;
+  c.clearRect(0, 0, W, CH);
 
-  const S = A.S;
   const padL = 34, padR = 8, padT = 8, padB = 18;
   c.strokeStyle = "rgba(141,159,255,.18)"; c.lineWidth = 1;
-  c.strokeRect(padL, padT, W - padL - padR, H - padT - padB);
-  if (!S || !A.analyzed){
+  c.strokeRect(padL, padT, W - padL - padR, CH - padT - padB);
+  if (!S || !ready){
     c.fillStyle = "#6b76a8"; c.font = "12px 'Lato',sans-serif"; c.textAlign = "center";
-    c.fillText("解析後に表示されます", W / 2, H / 2);
+    c.fillText("解析後に表示されます", W / 2, CH / 2);
     c.textAlign = "left";
     return;
   }
@@ -1372,7 +1486,7 @@ function renderChart(){
   vMin = Math.floor(vMin / 30) * 30; vMax = Math.ceil(vMax / 30) * 30;
   const tMax = S.t[S.t.length - 1] || 1;
   const X = t => padL + (t / tMax) * (W - padL - padR);
-  const Y = v => padT + (1 - (v - vMin) / (vMax - vMin)) * (H - padT - padB);
+  const Y = v => padT + (1 - (v - vMin) / (vMax - vMin)) * (CH - padT - padB);
 
   // 目盛り
   c.fillStyle = "#6b76a8"; c.font = "10px 'Lato',sans-serif"; c.textAlign = "right";
@@ -1384,17 +1498,17 @@ function renderChart(){
   }
   c.textAlign = "center";
   for (let t = 0; t <= tMax; t += (tMax > 8 ? 2 : 1)){
-    c.fillText(t + "s", X(t), H - 5);
+    c.fillText(t + "s", X(t), CH - 5);
   }
   c.textAlign = "left";
 
   // フェーズ縦線
-  if (A.phases){
+  if (phases){
     for (const d of PHASE_DEFS){
-      const x = X(S.t[A.phases[d.key]]);
+      const x = X(S.t[phases[d.key]]);
       c.strokeStyle = d.color; c.globalAlpha = 0.65; c.lineWidth = 1;
       c.setLineDash([4, 4]);
-      c.beginPath(); c.moveTo(x, padT); c.lineTo(x, H - padB); c.stroke();
+      c.beginPath(); c.moveTo(x, padT); c.lineTo(x, CH - padB); c.stroke();
       c.setLineDash([]); c.globalAlpha = 1;
       c.fillStyle = d.color; c.font = "9px 'Lato',sans-serif";
       c.fillText(d.label.slice(0, 2), x + 2, padT + 9);
@@ -1414,29 +1528,32 @@ function renderChart(){
     c.stroke();
   }
   // 現在位置カーソル
-  const cur = els.srcVideo.currentTime;
-  if (cur <= tMax){
+  if (curT != null && curT <= tMax){
     c.strokeStyle = "#eef1ff"; c.lineWidth = 1;
-    c.beginPath(); c.moveTo(X(cur), padT); c.lineTo(X(cur), H - padB); c.stroke();
+    c.beginPath(); c.moveTo(X(curT), padT); c.lineTo(X(curT), CH - padB); c.stroke();
   }
   cv._map = { padL, padR, tMax, W };
 }
 
-// チャートをクリック/ドラッグでシーク
-{
+function renderChart(){
+  drawChartInto(els.chart, A.S, A.phases, els.srcVideo.currentTime, A.analyzed);
+}
+
+// チャートをクリック/ドラッグでシーク（動画・履歴で共用）
+function attachChartSeek(cv, onSeek){
   let down = false;
   const seekFromEvent = e => {
-    const m = els.chart._map;
-    if (!m || !A.analyzed) return;
-    const rect = els.chart.getBoundingClientRect();
+    const m = cv._map;
+    if (!m) return;
+    const rect = cv.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const t = clamp((x - m.padL) / (m.W - m.padL - m.padR), 0, 1) * m.tMax;
-    els.srcVideo.currentTime = t;
+    onSeek(clamp((x - m.padL) / (m.W - m.padL - m.padR), 0, 1) * m.tMax);
   };
-  els.chart.addEventListener("pointerdown", e => { down = true; els.chart.setPointerCapture(e.pointerId); seekFromEvent(e); });
-  els.chart.addEventListener("pointermove", e => { if (down) seekFromEvent(e); });
-  els.chart.addEventListener("pointerup", () => down = false);
+  cv.addEventListener("pointerdown", e => { down = true; cv.setPointerCapture(e.pointerId); seekFromEvent(e); });
+  cv.addEventListener("pointermove", e => { if (down) seekFromEvent(e); });
+  cv.addEventListener("pointerup", () => down = false);
 }
+attachChartSeek(els.chart, t => { if (A.analyzed) els.srcVideo.currentTime = t; });
 
 /* =========================================================
    再生ループ・トランスポート
@@ -1463,7 +1580,7 @@ function tick(){
       shoulder:A.S.shoulder[idx], hip:A.S.hip[idx], xf:A.S.xf[idx],
       tilt:A.S.tilt[idx], headCm:A.S.headCm[idx], hipCm:A.S.hipCm[idx],
     });
-    const html = phaseBadgeHTML(t);
+    const html = phaseBadgeHTML(t, A.S, A.phases);
     els.phaseBadge.hidden = !html;
     if (els.phaseBadge.dataset.html !== html){
       els.phaseBadge.dataset.html = html;
@@ -1495,6 +1612,7 @@ $("stepFwd").onclick = () => stepFrame(1);
 els.speedSelect.onchange = () => els.srcVideo.playbackRate = parseFloat(els.speedSelect.value);
 els.timeline.addEventListener("pointerdown", () => dragging = true);
 els.timeline.addEventListener("pointerup", () => dragging = false);
+els.timeline.addEventListener("pointercancel", () => dragging = false);
 els.timeline.addEventListener("input", () => {
   if (A.analyzing) return;
   els.srcVideo.currentTime = parseFloat(els.timeline.value);
@@ -1730,12 +1848,330 @@ function stopRecording(analyze){
 }
 
 /* =========================================================
+   解析履歴（IndexedDBに自動保存・骨格リプレイで再生）
+   映像は保存せず、骨格データ+計測値+評価レポート+サムネのみ
+========================================================= */
+// 重い骨格フレームは "frames" ストアに分離し、一覧表示やpruneでは読み込まない
+const HDB = {
+  _db: null,
+  open(){
+    this._db ??= new Promise((res, rej) => {
+      const rq = indexedDB.open("swingscope", 2);
+      rq.onupgradeneeded = () => {
+        const db = rq.result;
+        if (!db.objectStoreNames.contains("analyses")) db.createObjectStore("analyses", { keyPath:"id" });
+        if (!db.objectStoreNames.contains("frames"))   db.createObjectStore("frames",   { keyPath:"id" });
+      };
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => rej(rq.error);
+    });
+    return this._db;
+  },
+  async run(stores, mode, fn){
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(stores, mode);
+      const out = fn(tx);
+      tx.oncomplete = () => res(out instanceof IDBRequest ? out.result : undefined);
+      tx.onerror = () => rej(tx.error);
+      tx.onabort = () => rej(tx.error);
+    });
+  },
+  putEntry(entry, frames){
+    return this.run(["analyses","frames"], "readwrite", tx => {
+      tx.objectStore("analyses").put(entry);
+      tx.objectStore("frames").put({ id:entry.id, n:frames.n, t:frames.t, data:frames.data });
+    });
+  },
+  allMeta(){ return this.run("analyses", "readonly", tx => tx.objectStore("analyses").getAll()); },
+  allKeys(){ return this.run("analyses", "readonly", tx => tx.objectStore("analyses").getAllKeys()); },
+  getMeta(id){ return this.run("analyses", "readonly", tx => tx.objectStore("analyses").get(id)); },
+  getFrames(id){ return this.run("frames", "readonly", tx => tx.objectStore("frames").get(id)); },
+  del(id){
+    return this.run(["analyses","frames"], "readwrite", tx => {
+      tx.objectStore("analyses").delete(id);
+      tx.objectStore("frames").delete(id);
+    });
+  },
+};
+
+// 骨格フレーム列をFloat32Arrayへ圧縮（x,y,visibility）。検出なしフレームはNaN
+function encodeFrames(frames){
+  const n = frames.length;
+  const t = new Float32Array(n);
+  const data = new Float32Array(n * 33 * 3).fill(NaN);
+  frames.forEach((f, i) => {
+    t[i] = f.t;
+    if (!f.lm) return;
+    for (let j = 0; j < 33; j++){
+      const p = f.lm[j], o = (i * 33 + j) * 3;
+      data[o] = p.x; data[o + 1] = p.y; data[o + 2] = p.visibility ?? 1;
+    }
+  });
+  return { n, t, data };
+}
+// リプレイ描画に必要な部分だけをランドマークから再構成
+function drawMetricsFromLm(lm, cw, ch){
+  const px = i => ({ x: lm[i].x * cw, y: lm[i].y * ch });
+  const vis = i => lm[i]?.visibility ?? 0;
+  const nose = px(LM.NOSE);
+  const midHip = { x:(px(LM.L_HIP).x + px(LM.R_HIP).x)/2, y:(px(LM.L_HIP).y + px(LM.R_HIP).y)/2 };
+  const midShoulder = { x:(px(LM.L_SHOULDER).x + px(LM.R_SHOULDER).x)/2, y:(px(LM.L_SHOULDER).y + px(LM.R_SHOULDER).y)/2 };
+  let wrist = null;
+  const wOkL = vis(LM.L_WRIST) > 0.4, wOkR = vis(LM.R_WRIST) > 0.4;
+  if (wOkL && wOkR){ const a = px(LM.L_WRIST), b = px(LM.R_WRIST); wrist = { x:(a.x+b.x)/2, y:(a.y+b.y)/2 }; }
+  else if (wOkL) wrist = px(LM.L_WRIST);
+  else if (wOkR) wrist = px(LM.R_WRIST);
+  return { nose, midHip, midShoulder, wrist };
+}
+function decodeFrames(enc, cw, ch){
+  const out = [];
+  for (let i = 0; i < enc.n; i++){
+    const base = i * 33 * 3;
+    if (Number.isNaN(enc.data[base])){ out.push({ t: enc.t[i], lm:null, m:null }); continue; }
+    const lm = [];
+    for (let j = 0; j < 33; j++){
+      const o = base + j * 3;
+      lm.push({ x: enc.data[o], y: enc.data[o + 1], z:0, visibility: enc.data[o + 2] });
+    }
+    out.push({ t: enc.t[i], lm, m: drawMetricsFromLm(lm, cw, ch) });
+  }
+  return out;
+}
+
+// トップ時の骨格をサムネイル化
+function makeThumb(){
+  try {
+    const P = A.phases;
+    const src = A.frames[P.top]?.lm ? A.frames[P.top] : A.frames.find(f => f.lm);
+    if (!src?.lm) return null;
+    const tw = 220, th = Math.max(60, Math.round(tw * A.ch / A.cw));
+    const cv = document.createElement("canvas"); cv.width = tw; cv.height = th;
+    const c = cv.getContext("2d");
+    const g = c.createLinearGradient(0, 0, 0, th);
+    g.addColorStop(0, "#0a1040"); g.addColorStop(1, "#050a30");
+    c.fillStyle = g; c.fillRect(0, 0, tw, th);
+    drawSkeleton(c, src.lm, tw, th, { color:COLORS.skeleton });
+    return cv.toDataURL("image/png");
+  } catch { return null; }
+}
+
+let histSaveTimer = null;
+function scheduleHistorySave(){
+  if (!A.analyzed || !A.phases || !A.derived?.items || A.histSuppressed) return;
+  clearTimeout(histSaveTimer);
+  histSaveTimer = setTimeout(() => saveHistoryNow().catch(e => console.warn("履歴の保存に失敗", e)), 600);
+}
+async function saveHistoryNow(){
+  const S = A.S, D = A.derived;
+  if (!S || !D?.items || !A.phases || A.histSuppressed) return;
+  A.historyId ??= "a_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  A.historyCreatedAt ??= Date.now();
+  const entry = {
+    id: A.historyId, createdAt: A.historyCreatedAt, updatedAt: Date.now(),
+    meta: {
+      duration:A.duration, fps:A.fps, cw:A.cw, ch:A.ch, view:D.view,
+      heightCm: parseFloat(els.heightInput.value) || 170, videoName: A.videoName || "",
+    },
+    score: D.score, tempo: D.tempo,
+    phases: { ...A.phases },
+    items: D.items.map(it => ({ name:it.name, g:it.g, disp: it.g==null ? null : it.disp(it.value), ideal:it.ideal, advice:it.advice })),
+    series: { t:[...S.t], shoulder:[...S.shoulder], hip:[...S.hip], xf:[...S.xf], tilt:[...S.tilt], headCm:[...S.headCm], hipCm:[...S.hipCm] },
+    thumb: makeThumb(),
+  };
+  await HDB.putEntry(entry, encodeFrames(A.frames));
+  await pruneHistory(50);
+  // 履歴一覧を表示中なら即反映
+  if (currentTab === "history" && !els.histList.hidden) renderHistoryList();
+}
+async function pruneHistory(max){
+  const all = await HDB.allMeta();
+  if (all.length <= max) return;
+  all.sort((a, b) => a.createdAt - b.createdAt);
+  for (const e of all.slice(0, all.length - max)) await HDB.del(e.id);
+}
+
+/* ---- 履歴UI ---- */
+const H = {
+  cur:null, frames:null, S:null, P:null, view:"face", cw:480, ch:640,
+  dur:0, t:0, playing:false, lastNow:null, cards:null, dragging:false,
+  lastChartT:-1, lastDrawnT:-1,
+};
+const hctx = els.histCanvas.getContext("2d");
+const fmtDate = ms => new Date(ms).toLocaleString("ja-JP", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" });
+
+async function renderHistoryList(){
+  els.histDetail.hidden = true;
+  els.histList.hidden = false;
+  H.playing = false;
+  let entries = [];
+  try { entries = await HDB.allMeta(); }
+  catch(e){
+    console.warn(e);
+    els.histGrid.innerHTML = "";
+    els.histEmpty.hidden = false;
+    els.histEmpty.textContent = "この環境では履歴を保存できません（プライベートブラウズ等ではIndexedDBが使えない場合があります）。";
+    return;
+  }
+  entries.sort((a, b) => b.createdAt - a.createdAt);
+  els.histEmpty.hidden = entries.length > 0;
+  els.histGrid.innerHTML = "";
+  for (const e of entries){
+    const stat = [];
+    if (e.tempo != null) stat.push(`テンポ ${e.tempo.toFixed(1)}:1`);
+    const sTop = e.series?.shoulder?.[e.phases?.top];
+    if (sTop != null) stat.push(`肩 ${Math.abs(sTop).toFixed(0)}°`);
+    const xTop = e.series?.xf?.[e.phases?.top];
+    if (xTop != null) stat.push(`XF ${Math.abs(xTop).toFixed(0)}°`);
+    const scoreColor = e.score == null ? "var(--sub)" : e.score >= 80 ? "var(--mint)" : e.score >= 60 ? "var(--amber)" : "var(--coral)";
+    const div = document.createElement("div");
+    div.className = "hist-card";
+    div.innerHTML = `
+      ${e.thumb ? `<img src="${e.thumb}" alt="">` : `<div class="hc-noimg"></div>`}
+      <div class="hc-body">
+        <div class="hc-date">${fmtDate(e.createdAt)}</div>
+        <div class="hc-row">
+          <span class="hc-score" style="color:${scoreColor}">${e.score ?? "--"}<small>点</small></span>
+          <span class="hc-chip">${e.meta?.view === "dtl" ? "後方" : "正面"}</span>
+        </div>
+        <div class="hc-stats">${stat.join("　") || "&nbsp;"}</div>
+      </div>`;
+    div.onclick = () => openHistory(e.id);
+    els.histGrid.appendChild(div);
+  }
+}
+
+async function openHistory(id){
+  let e = null, enc = null;
+  try {
+    e = await HDB.getMeta(id);
+    enc = (await HDB.getFrames(id)) ?? e?.frames ?? null;  // 旧形式（本体内包）フォールバック
+  } catch(err){ console.warn(err); }
+  if (!e || !enc){ showBanner("履歴を読み込めませんでした。", "info"); return; }
+  H.cur = e;
+  H.cw = e.meta.cw || 480; H.ch = e.meta.ch || 640;
+  els.histCanvas.width = H.cw; els.histCanvas.height = H.ch;
+  H.frames = decodeFrames(enc, H.cw, H.ch);
+  H.S = e.series; H.P = e.phases; H.view = e.meta.view || "face";
+  H.dur = H.S.t[H.S.t.length - 1] || e.meta.duration || 1;
+  H.t = H.S.t[H.P.address] ?? 0;
+  H.playing = false; H.lastNow = null; H.lastDrawnT = -1; H.lastChartT = -1; H.dragging = false;
+  els.histTimeline.max = H.dur;
+  els.histInfo.textContent =
+    `${fmtDate(e.createdAt)}　${e.meta.view === "dtl" ? "後方（DTL）" : "正面"}　${(e.meta.duration || 0).toFixed(1)}s / ${e.meta.fps}fps` +
+    (e.meta.videoName ? `　${e.meta.videoName}` : "");
+  H.cards = buildCards(els.histCards, videoCardDefs(H.view));
+  els.histScore.hidden = e.score == null;
+  if (e.score != null){
+    els.histScore.innerHTML = `${ic("gauge",13)}総合 ${e.score}点`;
+    els.histScore.style.background = scoreGrad(e.score);
+  }
+  els.histEval.innerHTML = evalListHTML(e.items, it => it.disp);
+  renderHistMarkers();
+  els.histList.hidden = true;
+  els.histDetail.hidden = false;
+  drawHistFrame();
+  drawChartInto(els.histChart, H.S, H.P, H.t, true);
+}
+
+function renderHistMarkers(){
+  els.histMarkers.innerHTML = "";
+  for (const d of PHASE_DEFS){
+    const t = H.S.t[H.P[d.key]];
+    if (t == null) continue;
+    const mk = document.createElement("div");
+    mk.className = "marker";
+    mk.style.left = (t / H.dur * 100) + "%";
+    mk.innerHTML = `<i style="background:${d.color}"></i>${d.label.slice(0,2)}`;
+    els.histMarkers.appendChild(mk);
+  }
+}
+
+function drawHistFrame(){
+  const g = hctx.createLinearGradient(0, 0, 0, H.ch);
+  g.addColorStop(0, "#0a1040"); g.addColorStop(1, "#050a30");
+  hctx.fillStyle = g; hctx.fillRect(0, 0, H.cw, H.ch);
+  const idx = nearestIdxIn(H.S.t, H.t);
+  if (idx < 0) return;
+  drawOverlays(hctx, {
+    cw:H.cw, ch:H.ch, frames:H.frames, S:H.S, P:H.P, idx, view:H.view,
+    ghost:true, trail:true, skeleton:true, guides:true, labels:true,
+  });
+  if (H.cards) updateCards(H.cards, {
+    shoulder:H.S.shoulder[idx], hip:H.S.hip[idx], xf:H.S.xf[idx],
+    tilt:H.S.tilt[idx], headCm:H.S.headCm[idx], hipCm:H.S.hipCm[idx],
+  });
+  const html = phaseBadgeHTML(H.t, H.S, H.P);
+  els.histPhaseBadge.hidden = !html;
+  if (els.histPhaseBadge.dataset.html !== html){
+    els.histPhaseBadge.dataset.html = html;
+    els.histPhaseBadge.innerHTML = html;
+  }
+}
+
+function histTick(now){
+  requestAnimationFrame(histTick);
+  if (currentTab !== "history" || els.histDetail.hidden || !H.frames) return;
+  if (H.playing){
+    if (H.lastNow != null){
+      // タブ非表示から復帰した際に一気に進まないよう、フレーム間隔をクランプ
+      const dt = Math.min(0.1, (now - H.lastNow) / 1000);
+      H.t += dt * parseFloat(els.histSpeed.value);
+      if (H.t >= H.dur){ H.t = H.dur; H.playing = false; }
+    }
+  }
+  H.lastNow = now;
+  const st = H.playing ? "pause" : "play";
+  if (els.histPlayBtn.dataset.st !== st){ els.histPlayBtn.dataset.st = st; els.histPlayBtn.innerHTML = ic(st, 17); }
+  if (!H.dragging) els.histTimeline.value = H.t;
+  els.histTimeLabel.textContent = `${fmtT(H.t)} / ${fmtT(H.dur)} s`;
+  if (H.t !== H.lastDrawnT){ drawHistFrame(); H.lastDrawnT = H.t; }
+  if (Math.abs(H.t - H.lastChartT) > 0.01){ drawChartInto(els.histChart, H.S, H.P, H.t, true); H.lastChartT = H.t; }
+}
+requestAnimationFrame(histTick);
+
+els.histPlayBtn.onclick = () => {
+  if (!H.frames) return;
+  if (!H.playing && H.t >= H.dur - 0.02) H.t = 0;
+  H.playing = !H.playing;
+  H.lastNow = null;
+};
+els.histTimeline.addEventListener("pointerdown", () => H.dragging = true);
+els.histTimeline.addEventListener("pointerup", () => H.dragging = false);
+els.histTimeline.addEventListener("pointercancel", () => H.dragging = false);
+els.histTimeline.addEventListener("input", () => { H.t = parseFloat(els.histTimeline.value); });
+els.histBackBtn.onclick = () => { H.playing = false; renderHistoryList(); };
+els.histDeleteBtn.onclick = async () => {
+  if (!H.cur) return;
+  if (!confirm("この履歴を削除しますか？")) return;
+  try { await HDB.del(H.cur.id); } catch(e){ console.warn(e); }
+  clearTimeout(histSaveTimer);  // 予約済みのデバウンス保存で復活しないように
+  if (A.historyId === H.cur.id) A.histSuppressed = true;  // 削除済み履歴を編集操作で復活させない
+  H.cur = null;
+  renderHistoryList();
+};
+attachChartSeek(els.histChart, t => { H.t = clamp(t, 0, H.dur); });
+
+/* =========================================================
    テスト用フック（動作検証用・UIには影響しない）
 ========================================================= */
 window.__swingTest = {
   loadVideoFile: f => loadVideoFromFile(f),
   setFakeDetector: fn => { window.__swingFakeDetector = fn; },
   initReal: async () => { const d = await createDetector(els.modelSelect.value); d.close?.(); return "ok"; },
+  history: {
+    list: () => HDB.allMeta(),
+    frames: id => HDB.getFrames(id),
+    open: id => openHistory(id),
+    saveNow: () => saveHistoryNow(),
+    clear: async () => { for (const id of await HDB.allKeys()) await HDB.del(id); },
+    state: () => ({
+      detailOpen: !els.histDetail.hidden, listOpen: !els.histList.hidden,
+      t:H.t, dur:H.dur, playing:H.playing, view:H.view, frames:H.frames?.length ?? 0,
+      cards:[...els.histCards.querySelectorAll(".m-label")].map(e => e.textContent),
+      evalRows: els.histEval.querySelectorAll(".eval-item").length,
+    }),
+  },
   getState: () => ({
     analyzed:A.analyzed, analyzing:A.analyzing, duration:A.duration, frames:A.frames.length,
     phases: (A.phases && A.S) ? Object.fromEntries(Object.entries(A.phases).map(([k, i]) => [k, A.S.t[i]])) : null,
